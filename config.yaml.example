@@ -1,0 +1,8 @@
+uDNS:
+  listen_addr: 0.0.0.0:53
+  nameservers: [1.1.1.1, 192.168.10.2]
+  forwarders:
+    contoso.com: 172.16.0.2
+  local:
+    host1: 192.168.0.1
+    host2: 192.168.0.2
