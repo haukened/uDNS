@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"strings"
 
@@ -40,15 +39,6 @@ func (h *dnsHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 	for _, question := range r.Question {
 		log.Printf("Received query: %s\n", question.Name)
-		// check the cache for the query
-		if values, ok := h.cache.Get(question.Name, question.Qtype); ok {
-			log.Printf("cache hit for %s\n", question.Name)
-			msg.Answer = append(msg.Answer, values...)
-			w.WriteMsg(msg)
-			return
-		}
-		// if the query is not in the cache, check for forwarders
-		// or fall back to the default name server
 		server, ok := h.getForwarder(question.Name)
 		if !ok {
 			log.Printf("no forwarder found for %s, using default upstream", question.Name)
@@ -62,7 +52,7 @@ func (h *dnsHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 		// TBD set cache - probably needs rework
 		for _, ans := range answers {
-			fmt.Println(ans)
+			h.cache.Add(ans)
 		}
 	}
 	w.WriteMsg(msg)
