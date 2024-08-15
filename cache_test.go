@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -88,8 +89,8 @@ func TestDNSCache_ValidAndInvalid(t *testing.T) {
 		t.Errorf("Expected to find 1 DNS record, but found %d", len(records))
 	}
 
-	if records[0].Value != "192.0.2.2" {
-		t.Errorf("Cache returned incorrect record, expected '192.0.2.2' got %s", records[0].Value)
+	if !strings.Contains(records[0].String(), "192.0.2.2") {
+		t.Errorf("Cache returned incorrect record, expected '192.0.2.2' got %s", records[0].String())
 	}
 }
 
@@ -108,7 +109,6 @@ func TestDNSCache_UpdateExpiration(t *testing.T) {
 	cache.Add(rr)
 
 	rr.Hdr.Ttl = 20
-	expected := time.Now().Add(20 * time.Second)
 	cache.Add(rr)
 
 	records, _ := cache.Get("example.com", dns.TypeA)
@@ -117,8 +117,8 @@ func TestDNSCache_UpdateExpiration(t *testing.T) {
 		t.Errorf("Expected to find 1 DNS record, but found %d", len(records))
 	}
 
-	if records[0].Expires.Sub(expected) > 1*time.Second {
-		t.Errorf("Expected expiration time to be %v, but got %v", expected, records[0].Expires)
+	if records[0].Header().Ttl < 19 {
+		t.Errorf("Expected expiration time to be >= 19, but got %v", records[0].Header().Ttl)
 	}
 }
 

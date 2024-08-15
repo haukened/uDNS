@@ -17,20 +17,21 @@ type DNSRecord struct {
 	Expires time.Time // The expiration time of the DNS record.
 }
 
+func (r DNSRecord) ToRR() (dns.RR, error) {
+	strValue := fmt.Sprintf("%s\t%d\tIN\t%s\t%s", r.Name, int(time.Until(r.Expires).Seconds()), dns.TypeToString[r.Type], r.Value)
+	return dns.NewRR(strValue)
+}
+
 // DNSCache represents a cache for DNS records.
 type DNSCache struct {
 	entries map[string][]DNSRecord
 }
 
-// mkCompositeKey creates a composite key from a key and a query type.
-// this is important because different record types can have the same key.
-func mkCompositeKey(key string, qtype uint16) string {
-	// ensure the key has the canonical DNS trailing .
+func canonicalizeKey(key string) string {
 	if !strings.HasSuffix(key, ".") {
 		key = key + "."
 	}
-	// return the composite key
-	return fmt.Sprintf("%s%d", key, qtype)
+	return key
 }
 
 func parseRR(rr dns.RR) (DNSRecord, error) {
@@ -59,8 +60,7 @@ func NewDNSCache() *DNSCache {
 // The value is a string representing the cache entry value.
 // The ttl is an unsigned 32-bit integer representing the time-to-live in seconds for the cache entry.
 func (c *DNSCache) Add(data dns.RR) {
-	// create a composite key
-	cKey := mkCompositeKey(data.Header().Name, data.Header().Rrtype)
+	cKey := canonicalizeKey(data.Header().Name)
 	// parse the RR
 	record, err := parseRR(data)
 	if err != nil {
@@ -104,12 +104,13 @@ func (c *DNSCache) Add(data dns.RR) {
 
 // Get retrieves the DNS records associated with the specified key and query type.
 // It returns a slice of DNSRecord and a boolean value indicating whether the records were found.
-func (c *DNSCache) Get(key string, qtype uint16) ([]DNSRecord, bool) {
-	cKey := mkCompositeKey(key, qtype)
+func (c *DNSCache) Get(key string, qtype uint16) (results []dns.RR, ok bool) {
+	// ensure that the key has the canonical DNS trailing .
+	cKey := canonicalizeKey(key)
 	validResults := []DNSRecord{}
 	rr, ok := c.entries[cKey]
 	if !ok {
-		return validResults, false
+		return
 	}
 	// check expiration time
 	for _, r := range rr {
@@ -123,18 +124,31 @@ func (c *DNSCache) Get(key string, qtype uint16) ([]DNSRecord, bool) {
 		// we don't need to store the expired records, so store valid results
 		if len(validResults) == 0 {
 			delete(c.entries, cKey)
+			ok = false
+			return
 		} else {
 			c.entries[cKey] = validResults
 		}
 	}
-	return validResults, len(validResults) > 0
+	// convert the DNSRecord to dns.RR
+	for _, r := range validResults {
+		rr, err := r.ToRR()
+		if err != nil {
+			log.Printf("unable to convert DNSRecord to RR: %v", err)
+			ok = false
+			return
+		}
+		results = append(results, rr)
+	}
+
+	return
 }
 
 // Delete removes the specified key from the DNSCache.
 // It takes the key as a string and the qtype as a uint16.
 // This function does not return any value.
 func (c *DNSCache) Delete(key string, qtype uint16) {
-	delete(c.entries, mkCompositeKey(key, qtype))
+	delete(c.entries, canonicalizeKey(key))
 }
 
 // Purge removes all entries from the DNS cache.
