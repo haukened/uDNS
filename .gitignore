@@ -26,6 +26,10 @@ go.work.sum
 
 # the actual binary
 uDNS
+uDNS.exe
+
+# vscode debug
+__debug*
 
 # any local config
 *.yaml
