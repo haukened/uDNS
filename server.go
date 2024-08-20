@@ -62,6 +62,11 @@ func (h *dnsHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		server, ok := h.getForwarder(question.Name)
 		if !ok {
 			log.Printf("no forwarder found for %s, using default upstream", question.Name)
+			if len(h.config.Nameservers) == 0 {
+				log.Printf("no nameservers configured, returning SERVFAIL")
+				msg.SetRcode(r, dns.RcodeServerFailure)
+				break
+			}
 			server = h.config.Nameservers[0]
 		} else {
 			log.Printf("forwarding query for %s to %s", question.Name, server)
