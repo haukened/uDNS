@@ -68,6 +68,13 @@ func (h *dnsHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		}
 		// send the query
 		answers := resolve(question.Name, question.Qtype, server)
+
+		// if we have no answers, we need to return an NXDomain
+		if len(answers) == 0 {
+			msg.SetRcode(r, dns.RcodeNameError)
+			break
+		}
+
 		msg.Answer = append(msg.Answer, answers...)
 
 		// TBD set cache - probably needs rework
